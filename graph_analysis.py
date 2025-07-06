@@ -1,11 +1,3 @@
-# %% [markdown]
-"""
-# Graph Analysis Notebook
-
-This notebook loads the graph from `edges.csv.gz` and performs an in-depth analysis of its structure and properties, with ~100k nodes and unknown number of edges. The goal is to understand key metrics, distributions, and components before tackling the Maximum Quasi-Clique problem.
-"""
-# %%
-# -- Imports and Configuration ------------------------------------------------
 import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -16,12 +8,6 @@ from collections import Counter
 import sys
 sys.setrecursionlimit(1000000)
 
-# %% [markdown]
-"""
-## 1. Load the Edge List and Construct the Graph
-"""
-# %%
-# Adjust path as needed
 df_edges = pd.read_csv("edges (1).csv.gz", compression='gzip', header=None, names=['source','target'])
 print(f"Loaded {len(df_edges)} edges")
 
@@ -29,21 +15,11 @@ print(f"Loaded {len(df_edges)} edges")
 G = nx.from_pandas_edgelist(df_edges, 'source', 'target', create_using=nx.Graph())
 print(f"Graph built: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
 
-# %% [markdown]
-"""
-## 2. Basic Graph Metrics
-"""
-# %%
 num_nodes = G.number_of_nodes()
 num_edges = G.number_of_edges()
 density = nx.density(G)
 print(f"Nodes: {num_nodes}\nEdges: {num_edges}\nDensity: {density:.2e}")
 
-# %% [markdown]
-"""
-## 3. Degree Distribution Analysis
-"""
-# %%
 # Compute degrees
 degrees = np.array([d for n, d in G.degree()])
 print(f"Degree: mean={degrees.mean():.2f}, median={np.median(degrees)}, max={degrees.max()}, std={degrees.std():.2f}")
@@ -61,11 +37,6 @@ plt.grid(True, which='both', ls='--', linewidth=0.5)
 plt.tight_layout()
 plt.show()
 
-# %% [markdown]
-"""
-## 4. Connected Components
-"""
-# %%
 components = list(nx.connected_components(G))
 sizes = [len(c) for c in components]
 sizes_sorted = sorted(sizes, reverse=True)
@@ -76,12 +47,6 @@ print("Top 10 component sizes:", sizes_sorted[:10])
 # Extract giant component subgraph
 giant = G.subgraph(components[sizes.index(sizes_sorted[0])]).copy()
 
-# %% [markdown]
-"""
-## 5. Path Lengths and Diameter (Approximations)
-"""
-# %%
-# Approximate average shortest path length by sampling
 import random
 sample_size = 500
 nodes = list(giant.nodes())
@@ -95,14 +60,8 @@ for _ in range(sample_size):
         pass
 print(f"Sampled average shortest path length: {np.mean(distances):.2f}")
 
-# Approximate diameter by taking the max of sampled distances
 print(f"Sampled diameter (max distance): {max(distances)}")
 
-# %% [markdown]
-"""
-## 6. Clustering Coefficient
-"""
-# %%
 avg_clust = nx.average_clustering(G)
 transitivity = nx.transitivity(G)
 print(f"Average local clustering coefficient: {avg_clust:.4f}")
@@ -118,19 +77,9 @@ plt.ylabel('Frequency')
 plt.tight_layout()
 plt.show()
 
-# %% [markdown]
-"""
-## 7. Degree Assortativity
-"""
-# %%
 assortativity = nx.degree_assortativity_coefficient(G)
 print(f"Degree assortativity coefficient: {assortativity:.4f}")
 
-# %% [markdown]
-"""
-## 8. Core Decomposition (k-core)
-"""
-# %%
 cores = nx.core_number(G)
 core_values = list(cores.values())
 print(f"Max core number: {max(core_values)}")
@@ -146,11 +95,6 @@ plt.ylabel('Number of nodes')
 plt.tight_layout()
 plt.show()
 
-# %% [markdown]
-"""
-## 9. Centrality Measures
-"""
-# %%
 # Top 10 by degree centrality
 deg_centrality = nx.degree_centrality(G)
 top_deg = sorted(deg_centrality.items(), key=lambda x: x[1], reverse=True)[:10]
@@ -161,24 +105,20 @@ pr = nx.pagerank(G, alpha=0.85, tol=1e-4, max_iter=100)
 top_pr = sorted(pr.items(), key=lambda x: x[1], reverse=True)[:10]
 print("Top 10 nodes by PageRank:", top_pr)
 
-# %% [markdown]
-"""
-## 10. Community Detection (Louvain Method)
-"""
-# %%
 # Requires `python-louvain` package: pip install python-louvain
-import community as community_louvain
-partition = community_louvain.best_partition(G)
-# Count communities
+from networkx.algorithms.community import louvain_communities
+
+# This returns a list of sets, one per community:
+comms = louvain_communities(G, weight=None, resolution=1)
+# Turn it into a node→community dict:
+partition = {node: cid for cid, com in enumerate(comms) for node in com}
+
+# Then compute sizes:
+from collections import Counter
 comm_sizes = Counter(partition.values())
 print(f"Detected {len(comm_sizes)} communities")
 print("Top 10 community sizes:", comm_sizes.most_common(10))
 
-# %% [markdown]
-"""
-## 11. Spectral Properties (Optional)
-"""
-# %%
 # Compute (small) eigenvalues of Laplacian for insight on connectivity
 # Might use scipy.sparse.linalg for large graphs
 from scipy.sparse import csgraph
@@ -190,12 +130,6 @@ L = nx.linalg.laplacianmatrix.laplacian_matrix(giant)
 eigvals, _ = eigsh(L, k=5, which='SM')
 print("Smallest non-zero Laplacian eigenvalues:", eigvals[1:])
 
-# %% [markdown]
-"""
-## 12. Sample Subgraph Visualization
-> *Visualization of the full graph is infeasible; instead we sample a subgraph induced by top-degree nodes.*
-"""
-# %%
 # Sample top 100 by degree
 top_nodes = [n for n, d in sorted(G.degree(), key=lambda x: x[1], reverse=True)[:100]]
 H = G.subgraph(top_nodes)
@@ -204,19 +138,3 @@ pos = nx.spring_layout(H, k=0.5)
 nx.draw(H, pos, node_size=20, with_labels=False)
 plt.title('Subgraph of Top 100 High-Degree Nodes')
 plt.show()
-
-# %% [markdown]
-"""
-### Summary of Findings
-- **Size & Density:** Large sparse graph (~100k nodes, density ~...
-- **Degree:** Heavy-tailed distribution, max degree ~...
-- **Connectivity:** Giant component covers ~...% of nodes, average path ~..., sampled diameter ~...
-- **Clustering:** Low average clustering but non-zero transitivity indicating local cliques.
-- **Assortativity:** Value indicates ...
-- **Cores:** Core number up to ..., indicating nested cohesive groups.
-- **Centrality:** Key nodes identified by degree & PageRank.
-- **Communities:** Detected ~... communities, largest size ~...
-- **Spectral:** Small Fiedler value suggests ...
-
-This deep analysis sets the stage for tackling the Maximum Quasi-Clique problem by highlighting dense regions and candidate core nodes.
-"""
